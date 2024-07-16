@@ -72,7 +72,7 @@ fn BoundedIntArb(T: type) type {
             const self: *@This() = @alignCast(@fieldParentPtr("arb", arb));
             assert(self.start < self.end);
             const diff = self.end - self.start;
-            return ((try Arbs.int(T).draw(data, allocator)) % diff) + self.start;
+            return ((try int(T).draw(data, allocator)) % diff) + self.start;
         }
     };
 }
@@ -127,7 +127,7 @@ fn FrequenciesArb(T: type) type {
                 }
             }
 
-            const pick = try Arbs.bounded_int(u64, 0, total).draw(data, allocator);
+            const pick = try bounded_int(u64, 0, total).draw(data, allocator);
             var current: u64 = 0;
             inline for (self.weights) |weighted| {
                 current += weighted[0];
@@ -161,7 +161,7 @@ fn EnumArb(T: type) type {
             inline for (@typeInfo(T).Enum.fields, 0..) |field, i| {
                 values[i] = field.value;
             }
-            const index = try Arbs.bounded_int(usize, 0, values.len).draw(data, allocator);
+            const index = try bounded_int(usize, 0, values.len).draw(data, allocator);
             const value = values[index];
             return @enumFromInt(value);
         }
@@ -179,45 +179,43 @@ fn FromFnArb(T: type, drawFn: fn (td: *TestData, allocator: std.mem.Allocator) a
     };
 }
 
-pub const Arbs = struct {
-    pub fn boolean() *Arb(bool) {
-        return @constCast(&(BoolArb{}).arb);
-    }
+pub fn boolean() *Arb(bool) {
+    return @constCast(&(BoolArb{}).arb);
+}
 
-    pub fn byte() *Arb(u8) {
-        return @constCast(&(ByteArb{}).arb);
-    }
+pub fn byte() *Arb(u8) {
+    return @constCast(&(ByteArb{}).arb);
+}
 
-    pub fn int(T: type) *Arb(T) {
-        return @constCast(&(IntArb(T){}).arb);
-    }
+pub fn int(T: type) *Arb(T) {
+    return @constCast(&(IntArb(T){}).arb);
+}
 
-    /// Draw an integer of type `T` between `start` (incl) and `end` (excl).
-    pub fn bounded_int(comptime T: type, start: T, end: T) *Arb(T) {
-        return @constCast(&(BoundedIntArb(T){ .start = start, .end = end }).arb);
-    }
+/// Draw an integer of type `T` between `start` (incl) and `end` (excl).
+pub fn bounded_int(comptime T: type, start: T, end: T) *Arb(T) {
+    return @constCast(&(BoundedIntArb(T){ .start = start, .end = end }).arb);
+}
 
-    pub fn slice(T: type, value_arb: *Arb(T), min_length: usize, max_length: usize) *Arb([]T) {
-        // TODO: Pass in allocator? Or put all of these helpers in a struct with an allocator field?
-        return @constCast(&(SliceArb(T){ .value_arb = value_arb, .min_length = min_length, .max_length = max_length }).arb);
-    }
+pub fn slice(T: type, value_arb: *Arb(T), min_length: usize, max_length: usize) *Arb([]T) {
+    // TODO: Pass in allocator? Or put all of these helpers in a struct with an allocator field?
+    return @constCast(&(SliceArb(T){ .value_arb = value_arb, .min_length = min_length, .max_length = max_length }).arb);
+}
 
-    pub fn frequencies(T: type, weights: []const Weighted(*Arb(T))) *Arb(T) {
-        return @constCast(&(FrequenciesArb(T){ .weights = weights }).arb);
-    }
+pub fn frequencies(T: type, weights: []const Weighted(*Arb(T))) *Arb(T) {
+    return @constCast(&(FrequenciesArb(T){ .weights = weights }).arb);
+}
 
-    pub fn constant(T: type, value: T) *Arb(T) {
-        return @constCast(&(ConstantArb(T, value){}).arb);
-    }
+pub fn constant(T: type, value: T) *Arb(T) {
+    return @constCast(&(ConstantArb(T, value){}).arb);
+}
 
-    pub fn enum_value(T: type) *Arb(T) {
-        return @constCast(&(EnumArb(T){}).arb);
-    }
+pub fn enum_value(T: type) *Arb(T) {
+    return @constCast(&(EnumArb(T){}).arb);
+}
 
-    pub fn from_fn(
-        T: type,
-        f: fn (td: *TestData, allocator: std.mem.Allocator) anyerror!T,
-    ) *Arb(T) {
-        return @constCast(&(FromFnArb(T, f){}).arb);
-    }
-};
+pub fn from_fn(
+    T: type,
+    f: fn (td: *TestData, allocator: std.mem.Allocator) anyerror!T,
+) *Arb(T) {
+    return @constCast(&(FromFnArb(T, f){}).arb);
+}

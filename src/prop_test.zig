@@ -4,7 +4,6 @@ const assert = std.debug.assert;
 const TestData = @import("./test_data.zig").TestData;
 
 const arb = @import("./arb.zig");
-const Arbs = arb.Arbs;
 const Arb = arb.Arb;
 
 const prop_test = @import("./prop.zig").prop_test;
@@ -27,7 +26,7 @@ fn prop_example1(values: []Example1Value) !void {
 }
 
 test "prop_test_example1" {
-    try prop_test([]Example1Value, test_allocator, .{}, Arbs.slice(Example1Value, Arbs.enum_value(Example1Value), 0, 10), prop_example1);
+    try prop_test([]Example1Value, test_allocator, .{}, arb.slice(Example1Value, arb.enum_value(Example1Value), 0, 10), prop_example1);
 }
 
 fn prop_example2(values: []u32) !void {
@@ -41,7 +40,7 @@ fn prop_example2(values: []u32) !void {
 }
 
 test "prop_test_example2" {
-    try prop_test([]u32, test_allocator, .{ .max_shrinks = 10000 }, Arbs.slice(u32, Arbs.bounded_int(u32, 0, 100), 1, 10), prop_example2);
+    try prop_test([]u32, test_allocator, .{ .max_shrinks = 10000 }, arb.slice(u32, arb.bounded_int(u32, 0, 100), 1, 10), prop_example2);
 }
 
 pub fn Tree(T: type) type {
@@ -53,7 +52,7 @@ pub fn Tree(T: type) type {
 }
 
 fn arb_tree(data: *TestData, allocator: std.mem.Allocator) !*Tree(u32) {
-    const numbers = Arbs.bounded_int(u32, 0, 10);
+    const numbers = arb.bounded_int(u32, 0, 10);
     var roots = std.fifo.LinearFifo(*Tree(u32), .Dynamic).init(allocator);
     var labels = std.fifo.LinearFifo(u32, .Dynamic).init(allocator);
 
@@ -115,5 +114,5 @@ fn prop_example3(tree: *Tree(u32)) !void {
 }
 
 test "prop_test_example3" {
-    try prop_test(*Tree(u32), test_allocator, .{ .max_shrinks = 10000 }, Arbs.from_fn(*Tree(u32), arb_tree), prop_example3);
+    try prop_test(*Tree(u32), test_allocator, .{ .max_shrinks = 10000 }, arb.from_fn(*Tree(u32), arb_tree), prop_example3);
 }

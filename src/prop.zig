@@ -4,9 +4,7 @@ const assert = std.debug.assert;
 const test_data = @import("./test_data.zig");
 const TestData = test_data.TestData;
 
-const arb = @import("./arb.zig");
-const Arbs = arb.Arbs;
-const Arb = arb.Arb;
+const Arb = @import("./arb.zig").Arb;
 
 const PropTestConfig = struct {
     size: ?usize = null,
