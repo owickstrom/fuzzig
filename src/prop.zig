@@ -18,15 +18,13 @@ fn random_seed() !u64 {
     return seed;
 }
 
-fn Prop(I: type) type {
-    return fn (I) anyerror!void;
-}
+const Prop = fn (*TestData) anyerror!void;
 
 const PropTestError = error{PropTestFailed};
 
 // TODO: package this up in a struct that holds the allocator and config?
 
-pub fn prop_test(I: type, allocator: std.mem.Allocator, config: PropTestConfig, arb_input: *Arb(I), prop: Prop(I)) !void {
+pub fn check(allocator: std.mem.Allocator, config: PropTestConfig, prop: Prop) !void {
     const size = config.size orelse 1024;
 
     for (0..config.runs) |i| {
@@ -38,18 +36,14 @@ pub fn prop_test(I: type, allocator: std.mem.Allocator, config: PropTestConfig, 
         var td = try TestData.init(allocator, entropy);
         defer td.deinit(allocator);
 
-        const input = try arb_input.draw(td, allocator);
-
-        if (prop(input)) |_| {} else |err| {
+        if (prop(td)) |_| {} else |err| {
             const counter_example =
-                try shrink(I, allocator, config, td, arb_input, prop) orelse
-                CounterExample(I){ .num = 0, .entropy = entropy, .input = input, .err = err };
-            std.debug.print("original entropy: {}\n", .{std.fmt.fmtSliceHexLower(entropy)});
-            std.debug.print("\noriginal input: {any}\n", .{input});
+                try shrink(allocator, config, td, prop) orelse
+                CounterExample{ .num = 0, .entropy = entropy, .err = err };
+            std.debug.print("\noriginal entropy: {}\n", .{std.fmt.fmtSliceHexLower(entropy)});
             std.debug.print("failed after {} run(s) and {} shrink(s)!\n", .{ i + 1, counter_example.num });
             if (counter_example.num > 0) {
                 std.debug.print("shrunk entropy: {}\n", .{std.fmt.fmtSliceHexLower(counter_example.entropy)});
-                std.debug.print("shrunk input: {any}\n", .{counter_example.input});
             }
             return counter_example.err;
         }
@@ -58,14 +52,11 @@ pub fn prop_test(I: type, allocator: std.mem.Allocator, config: PropTestConfig, 
 
 const CandidatesQueue = std.fifo.LinearFifo([]u8, .Dynamic);
 
-fn CounterExample(T: type) type {
-    return struct {
-        num: u32,
-        entropy: []u8,
-        input: T,
-        err: anyerror,
-    };
-}
+const CounterExample = struct {
+    num: u32,
+    entropy: []u8,
+    err: anyerror,
+};
 
 fn add_smaller(allocator: std.mem.Allocator, entropy: []u8, queue: *CandidatesQueue) !void {
     if (entropy.len > 1 and @mod(entropy.len, 2) == 0) {
@@ -122,7 +113,7 @@ fn is_smaller_than(left: []u8, right: []u8) bool {
     }
 }
 
-fn shrink(T: type, allocator: std.mem.Allocator, config: PropTestConfig, data: *TestData, arb_input: *Arb(T), prop: Prop(T)) !?CounterExample(T) {
+fn shrink(allocator: std.mem.Allocator, config: PropTestConfig, data: *TestData, prop: Prop) !?CounterExample {
     // TODO: tree of candidates (maybe ranges into the original entropy)?
     var candidates: CandidatesQueue = CandidatesQueue.init(allocator);
     defer candidates.deinit();
@@ -131,7 +122,7 @@ fn shrink(T: type, allocator: std.mem.Allocator, config: PropTestConfig, data: *
     // that all unused entropy is discarded straight away.
     try add_smaller(allocator, data.trimmed(), &candidates);
 
-    var counter_example_smallest: ?CounterExample(T) = null;
+    var counter_example_smallest: ?CounterExample = null;
     for (0..config.max_shrinks) |shrink_index| {
         const candidate = candidates.readItem() orelse {
             // No more candidates available.
@@ -141,24 +132,29 @@ fn shrink(T: type, allocator: std.mem.Allocator, config: PropTestConfig, data: *
         var shorter_data = try TestData.init(allocator, candidate);
         defer shorter_data.deinit(allocator);
 
-        const input = arb_input.draw(shorter_data, allocator) catch {
-            // If we can't draw, the entropy has probably been shrunk too much.
-            break;
-        };
-        if (prop(input)) |_| {
+        if (prop(shorter_data)) |_| {
             // This candidate doesn't fail the property, so we continue searching for other (smaller) inputs.
             continue;
         } else |err| {
-            const counter_example_new: CounterExample(T) =
-                .{ .num = @intCast(shrink_index + 1), .entropy = candidate, .input = input, .err = err };
-            if (counter_example_smallest) |counter_example_old| {
-                if (is_smaller_than(counter_example_new.entropy, counter_example_old.entropy)) {
-                    counter_example_smallest = counter_example_new;
-                }
-            } else {
-                counter_example_smallest = counter_example_new;
+            switch (err) {
+                error.OutOfEntropy => {
+                    // If we can't draw, the entropy has probably been shrunk too much.
+                    // TODO: remove this assumption and try to shrink anyway? perhaps just changing the strategy?
+                    break;
+                },
+                else => {
+                    const counter_example_new: CounterExample =
+                        .{ .num = @intCast(shrink_index + 1), .entropy = candidate, .err = err };
+                    if (counter_example_smallest) |counter_example_old| {
+                        if (is_smaller_than(counter_example_new.entropy, counter_example_old.entropy)) {
+                            counter_example_smallest = counter_example_new;
+                        }
+                    } else {
+                        counter_example_smallest = counter_example_new;
+                    }
+                    try add_smaller(allocator, candidate, &candidates);
+                },
             }
-            try add_smaller(allocator, candidate, &candidates);
         }
     }
 

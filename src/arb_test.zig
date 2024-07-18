@@ -15,7 +15,7 @@ test "int" {
     var td = try TestData.init(test_allocator, entropy);
     defer td.deinit(test_allocator);
 
-    const n = try arb.int(u32).draw(td, test_allocator);
+    const n = try arb.int(u32, td);
     try std.testing.expectEqual(3743615817, n);
 }
 
@@ -27,12 +27,12 @@ test "bounded_int" {
     defer td.deinit(test_allocator);
 
     for (0..100) |_| {
-        const n = try arb.bounded_int(u32, 0, 10).draw(td, test_allocator);
+        const n = try arb.bounded_int(u32, 0, 10, td);
         try std.testing.expect(n <= 10);
     }
 }
 
-test "slice" {
+test "array of bounded_int" {
     // Number of ints we want to draw.
     const size = 10000;
 
@@ -43,49 +43,42 @@ test "slice" {
     var td = try TestData.init(test_allocator, entropy);
     defer td.deinit(test_allocator);
 
-    const ns = try arb.slice(u32, arb.bounded_int(u32, 0, 10), 0, size).draw(td, test_allocator);
+    var result: [size]u32 = undefined;
+    for (0..size) |i| {
+        result[i] = try arb.bounded_int(u32, 0, 10, td);
+    }
 
-    // We expect the `size` to be respected as we have enough entropy.
-    try std.testing.expectEqual(size, ns.len);
-    for (ns) |n| {
+    for (result) |n| {
         try std.testing.expect(n <= 10);
     }
 }
 
-test "single weighted" {
-    const entropy = try test_data.random_bytes(test_allocator, 1024, 0);
-    defer test_allocator.free(entropy);
+// test "single weighted" {
+//     const entropy = try test_data.random_bytes(test_allocator, 1024, 0);
+//     defer test_allocator.free(entropy);
+//
+//     var td = try TestData.init(test_allocator, entropy);
+//     defer td.deinit(test_allocator);
+//
+//     const n = try arb.frequencies(u32, &.{
+//         .{ 1, arb.bounded_int(u32, 10, 20) },
+//     }).draw(td, test_allocator);
+//     try std.testing.expectEqual(13, n);
+// }
 
-    var td = try TestData.init(test_allocator, entropy);
-    defer td.deinit(test_allocator);
-
-    const n = try arb.frequencies(u32, &.{
-        .{ 1, arb.bounded_int(u32, 10, 20) },
-    }).draw(td, test_allocator);
-    try std.testing.expectEqual(13, n);
-}
-
-test "multiple weighted" {
-    const entropy = try test_data.random_bytes(test_allocator, 1024, 0);
-    defer test_allocator.free(entropy);
-
-    var td = try TestData.init(test_allocator, entropy);
-    defer td.deinit(test_allocator);
-
-    const n = try arb.frequencies(u32, &.{
-        .{ 1, arb.bounded_int(u32, 0, 10) },
-        .{ 2, arb.bounded_int(u32, 10, 20) },
-    }).draw(td, test_allocator);
-    try std.testing.expectEqual(13, n);
-}
-
-test "constant" {
-    var td = try TestData.init(test_allocator, &.{});
-    defer td.deinit(test_allocator);
-
-    const n = try arb.constant(u32, 10).draw(td, test_allocator);
-    try std.testing.expectEqual(10, n);
-}
+// test "multiple weighted" {
+//     const entropy = try test_data.random_bytes(test_allocator, 1024, 0);
+//     defer test_allocator.free(entropy);
+//
+//     var td = try TestData.init(test_allocator, entropy);
+//     defer td.deinit(test_allocator);
+//
+//     const n = try arb.frequencies(u32, &.{
+//         .{ 1, arb.bounded_int(u32, 0, 10) },
+//         .{ 2, arb.bounded_int(u32, 10, 20) },
+//     }).draw(td, test_allocator);
+//     try std.testing.expectEqual(13, n);
+// }
 
 const Color = enum { Red, Green, Blue };
 
@@ -96,6 +89,6 @@ test "enum_value" {
     var td = try TestData.init(test_allocator, entropy);
     defer td.deinit(test_allocator);
 
-    const color = try arb.enum_value(Color).draw(td, test_allocator);
+    const color = try arb.enum_value(Color, td);
     try std.testing.expectEqual(.Blue, color);
 }

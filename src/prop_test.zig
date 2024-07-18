@@ -6,7 +6,7 @@ const TestData = @import("./test_data.zig").TestData;
 const arb = @import("./arb.zig");
 const Arb = arb.Arb;
 
-const prop_test = @import("./prop.zig").prop_test;
+const prop = @import("./prop.zig");
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const test_allocator = gpa.allocator();
@@ -19,28 +19,32 @@ const Example1Value = enum {
     V5,
 };
 
-fn prop_example1(values: []Example1Value) !void {
-    for (values) |value| {
+fn prop_example1(data: *TestData) !void {
+    for (0..5) |_| {
+        const value = try arb.enum_value(Example1Value, data);
         try std.testing.expect(value != .V5);
     }
 }
 
-test "prop_test_example1" {
-    try prop_test([]Example1Value, test_allocator, .{}, arb.slice(Example1Value, arb.enum_value(Example1Value), 0, 10), prop_example1);
+test "prop_check_example1" {
+    const result = prop.check(test_allocator, .{}, prop_example1);
+    try std.testing.expectError(error.TestUnexpectedResult, result);
 }
 
-fn prop_example2(values: []u32) !void {
+fn prop_example2(data: *TestData) !void {
     var count: u32 = 0;
-    for (values) |value| {
+    for (0..100) |_| {
+        const value = try arb.bounded_int(u32, 0, 100, data);
         if (value < 10) {
             count += 1;
         }
     }
-    try std.testing.expect(count <= values.len / 10);
+    try std.testing.expect(count <= 10);
 }
 
-test "prop_test_example2" {
-    try prop_test([]u32, test_allocator, .{ .max_shrinks = 10000 }, arb.slice(u32, arb.bounded_int(u32, 0, 100), 1, 10), prop_example2);
+test "prop_check_example2" {
+    const result = prop.check(test_allocator, .{ .max_shrinks = 10000 }, prop_example2);
+    try std.testing.expectError(error.TestUnexpectedResult, result);
 }
 
 pub fn Tree(T: type) type {
@@ -51,15 +55,14 @@ pub fn Tree(T: type) type {
     };
 }
 
-fn arb_tree(data: *TestData, allocator: std.mem.Allocator) !*Tree(u32) {
-    const numbers = arb.bounded_int(u32, 0, 10);
+fn arb_tree(data: *TestData, allocator: std.mem.Allocator) !*const Tree(u32) {
     var roots = std.fifo.LinearFifo(*Tree(u32), .Dynamic).init(allocator);
     var labels = std.fifo.LinearFifo(u32, .Dynamic).init(allocator);
 
     // Draw labels until out of entropy or configured size.
     // TODO: parameterize size somehow
     for (0..100) |_| {
-        const label = numbers.draw(data, allocator) catch break;
+        const label = arb.bounded_int(u32, 0, 10, data) catch break;
         try labels.writeItem(label);
     }
 
@@ -90,14 +93,16 @@ fn arb_tree(data: *TestData, allocator: std.mem.Allocator) !*Tree(u32) {
 }
 
 // Tries to find a tree with duplicate labels
-fn prop_example3(tree: *Tree(u32)) !void {
+fn prop_example3(data: *TestData) !void {
     var seen = std.hash_map.AutoHashMap(u32, void).init(test_allocator);
     defer seen.deinit();
 
-    var pending = std.fifo.LinearFifo(*Tree(u32), .Dynamic).init(test_allocator);
+    var pending = std.fifo.LinearFifo(*const Tree(u32), .Dynamic).init(test_allocator);
     defer pending.deinit();
 
-    try pending.writeItem(@constCast(tree));
+    const tree = try arb_tree(data, test_allocator);
+
+    try pending.writeItem(tree);
 
     while (pending.readableLength() > 0) {
         const tree_new = pending.readItem() orelse break;
@@ -113,6 +118,7 @@ fn prop_example3(tree: *Tree(u32)) !void {
     }
 }
 
-test "prop_test_example3" {
-    try prop_test(*Tree(u32), test_allocator, .{ .max_shrinks = 10000 }, arb.from_fn(*Tree(u32), arb_tree), prop_example3);
+test "prop_check_example3" {
+    const result = prop.check(test_allocator, .{ .max_shrinks = 10000 }, prop_example3);
+    try std.testing.expectError(error.TestUnexpectedResult, result);
 }
