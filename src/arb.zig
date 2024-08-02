@@ -25,7 +25,47 @@ const TestData = test_data.TestData;
 //     }
 //     unreachable;
 // }
-//
+
+fn weighted_tag_type(weights: anytype) type {
+    switch (@typeInfo(@TypeOf(weights))) {
+        .Struct => |_| {},
+        else => |info| @compileError("weights must be a struct, where each field type is an unsigned integer, but was " ++ info),
+    }
+    return std.meta.FieldEnum(@TypeOf(weights));
+}
+
+pub fn weighted(comptime weights: anytype, data: *TestData) !weighted_tag_type(weights) {
+    const s = switch (@typeInfo(@TypeOf(weights))) {
+        .Struct => |s| s,
+        else => @compileError("weights must be a struct, where each field type is an unsigned integer"),
+    };
+    const enum_type = std.meta.FieldEnum(@TypeOf(weights));
+    comptime var total: u64 = 0;
+    comptime var enum_weights: [s.fields.len]std.meta.Tuple(&.{ enum_type, comptime_int }) = undefined;
+
+    comptime {
+        for (s.fields, 0..) |field, i| {
+            const weight: comptime_int = @field(weights, field.name);
+            assert(weight > 0);
+            total += weight;
+            @compileLog(weights);
+            @compileLog(enum_type, field.name);
+            const value = std.meta.stringToEnum(enum_type, field.name).?;
+            @compileLog(value);
+            enum_weights[i] = .{ value, weight };
+        }
+    }
+
+    const pick = try bounded_int(u64, 0, total, data);
+    var current: u64 = 0;
+    for (s.fields) |field| {
+        current += field.default_value;
+        if (pick < current) {
+            return enum_value(enum_type, data);
+        }
+    }
+    unreachable;
+}
 
 pub fn boolean(data: *TestData) test_data.DrawError!bool {
     const bytes: [1]u8 = undefined;

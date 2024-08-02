@@ -53,18 +53,16 @@ test "array of bounded_int" {
     }
 }
 
-// test "single weighted" {
-//     const entropy = try test_data.random_bytes(test_allocator, 1024, 0);
-//     defer test_allocator.free(entropy);
-//
-//     var td = try TestData.init(test_allocator, entropy);
-//     defer td.deinit(test_allocator);
-//
-//     const n = try arb.frequencies(u32, &.{
-//         .{ 1, arb.bounded_int(u32, 10, 20) },
-//     }).draw(td, test_allocator);
-//     try std.testing.expectEqual(13, n);
-// }
+test "single weighted" {
+    const entropy = try test_data.random_bytes(test_allocator, 1024, 0);
+    defer test_allocator.free(entropy);
+
+    var td = try TestData.init(test_allocator, entropy);
+    defer td.deinit(test_allocator);
+
+    const tag = try arb.weighted(.{ .foo = 123 }, td);
+    try std.testing.expectEqual(.foo, tag);
+}
 
 // test "multiple weighted" {
 //     const entropy = try test_data.random_bytes(test_allocator, 1024, 0);
