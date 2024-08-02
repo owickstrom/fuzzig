@@ -60,7 +60,7 @@ test "single weighted" {
     var td = try TestData.init(test_allocator, entropy);
     defer td.deinit(test_allocator);
 
-    const tag = try arb.weighted(.{ .foo = 123 }, td);
+    const tag = try arb.weighted(enum { foo }, .{ .foo = 123 }, td);
     try std.testing.expectEqual(.foo, tag);
 }
 

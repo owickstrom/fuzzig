@@ -26,42 +26,32 @@ const TestData = test_data.TestData;
 //     unreachable;
 // }
 
-fn weighted_tag_type(weights: anytype) type {
-    switch (@typeInfo(@TypeOf(weights))) {
-        .Struct => |_| {},
-        else => |info| @compileError("weights must be a struct, where each field type is an unsigned integer, but was " ++ info),
-    }
-    return std.meta.FieldEnum(@TypeOf(weights));
-}
-
-pub fn weighted(comptime weights: anytype, data: *TestData) !weighted_tag_type(weights) {
-    const s = switch (@typeInfo(@TypeOf(weights))) {
-        .Struct => |s| s,
-        else => @compileError("weights must be a struct, where each field type is an unsigned integer"),
-    };
-    const enum_type = std.meta.FieldEnum(@TypeOf(weights));
+/// Draw an enum value from `E` based on the relative `weights`. Fields in the weights struct must match
+/// the enum.
+///
+/// The `E` type parameter should be inferred, but seemingly to due to https://github.com/ziglang/zig/issues/19985,
+/// it can't be.
+pub fn weighted(comptime E: type, comptime weights: std.enums.EnumFieldStruct(E, u32, null), data: *TestData) !E {
+    const s = @typeInfo(@TypeOf(weights)).Struct;
     comptime var total: u64 = 0;
-    comptime var enum_weights: [s.fields.len]std.meta.Tuple(&.{ enum_type, comptime_int }) = undefined;
+    comptime var enum_weights: [s.fields.len]std.meta.Tuple(&.{ E, comptime_int }) = undefined;
 
     comptime {
         for (s.fields, 0..) |field, i| {
             const weight: comptime_int = @field(weights, field.name);
             assert(weight > 0);
             total += weight;
-            @compileLog(weights);
-            @compileLog(enum_type, field.name);
-            const value = std.meta.stringToEnum(enum_type, field.name).?;
-            @compileLog(value);
+            const value = std.meta.stringToEnum(E, field.name).?;
             enum_weights[i] = .{ value, weight };
         }
     }
 
     const pick = try bounded_int(u64, 0, total, data);
     var current: u64 = 0;
-    for (s.fields) |field| {
-        current += field.default_value;
+    inline for (enum_weights) |w| {
+        current += w[1];
         if (pick < current) {
-            return enum_value(enum_type, data);
+            return w[0];
         }
     }
     unreachable;
