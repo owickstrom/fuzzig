@@ -46,11 +46,11 @@ pub fn weighted(comptime E: type, comptime weights: std.enums.EnumFieldStruct(E,
         }
     }
 
-    const pick = try bounded_int(u64, 0, total, data);
+    const pick = try bounded_int(u64, 1, total + 1, data);
     var current: u64 = 0;
     inline for (enum_weights) |w| {
         current += w[1];
-        if (pick < current) {
+        if (pick <= current) {
             return w[0];
         }
     }

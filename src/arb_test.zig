@@ -60,7 +60,7 @@ test "single weighted" {
     var td = try TestData.init(test_allocator, entropy);
     defer td.deinit(test_allocator);
 
-    const tag = try arb.weighted(enum { foo }, .{ .foo = 123 }, td);
+    const tag = try arb.weighted(enum { foo }, .{ .foo = 1 }, td);
     try std.testing.expectEqual(.foo, tag);
 }
 
@@ -76,6 +76,22 @@ test "multiple weighted" {
         .bar = 2,
     }, td);
     try std.testing.expect(x == .foo or x == .bar);
+}
+
+test "many weighted" {
+    // run with many seeds
+    for (0..1000) |i| {
+        const entropy = try test_data.random_bytes(test_allocator, 1024, i);
+        defer test_allocator.free(entropy);
+
+        var td = try TestData.init(test_allocator, entropy);
+        defer td.deinit(test_allocator);
+
+        const x = try arb.weighted(enum { foo }, .{
+            .foo = 100,
+        }, td);
+        try std.testing.expect(x == .foo);
+    }
 }
 
 const Color = enum { Red, Green, Blue };
