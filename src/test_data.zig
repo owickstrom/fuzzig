@@ -3,25 +3,6 @@ const assert = std.debug.assert;
 
 pub const DrawError = error{OutOfEntropy};
 
-/// Calculate how many bytes to allocate in order to fit a given number of bits.
-pub fn required_bytes(bits: u64) u64 {
-    if (@rem(bits, 8) == 0) {
-        return @divExact(bits, 8);
-    } else {
-        return std.math.divCeil(u64, bits, 8) catch |e| {
-            @compileError("can't calculate required bytes for bits: " ++ @typeName(e));
-        };
-    }
-}
-
-comptime {
-    assert(required_bytes(16) == 2);
-    assert(required_bytes(9) == 2);
-    assert(required_bytes(8) == 1);
-    assert(required_bytes(7) == 1);
-    assert(required_bytes(0) == 0);
-}
-
 pub const TestData = struct {
     entropy: []u8,
     cursor: usize,
