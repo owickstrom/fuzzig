@@ -106,3 +106,100 @@ test "enum_value" {
     const color = try arb.enum_value(Color, td);
     try std.testing.expectEqual(.Blue, color);
 }
+
+const Graph = struct {
+    len: u64,
+    edges: []std.ArrayList(Node),
+
+    const Node = u64;
+    const Edge = std.meta.Tuple(&.{ Node, Node });
+    const Distance = u64;
+
+    const Self = @This();
+
+    fn init(allocator: std.mem.Allocator, edges: []const Edge) !Self {
+        var max_node: u64 = 0;
+        for (edges) |e| {
+            max_node = @max(max_node, @max(e[0], e[1]));
+        }
+        const len = max_node + 1;
+        var outbound = try allocator.alloc(std.ArrayList(Node), len);
+
+        for (0..len) |n| {
+            outbound[n] = std.ArrayList(Node).init(allocator);
+        }
+
+        for (edges) |e| {
+            try outbound[e[0]].append(e[1]);
+        }
+
+        return .{ .len = len, .edges = outbound };
+    }
+
+    fn deinit(self: Self, _: std.mem.Allocator) void {
+        for (self.edges) |e| {
+            e.deinit();
+        }
+    }
+
+    fn shortest_path(self: Self, allocator: std.mem.Allocator, source: Node) ![]?Distance {
+        var unvisited = try std.bit_set.DynamicBitSetUnmanaged.initFull(allocator, self.len);
+        defer unvisited.deinit(allocator);
+
+        const distance_from_start = try allocator.alloc(?u64, self.len);
+        for (0..self.len) |n| {
+            distance_from_start[n] = null;
+        }
+        distance_from_start[source] = 0;
+
+        while (unvisited.count() > 0) {
+            // Select the current node to be the one with the smallest distance
+            const Current = struct { node: Node, distance: Distance };
+            var current: ?Current = null;
+            var candidates = unvisited.iterator(.{});
+            while (candidates.next()) |n| {
+                if (distance_from_start[n]) |d| {
+                    if (current) |c| {
+                        if (d < c.distance) {
+                            current = .{ .node = n, .distance = d };
+                        }
+                    } else {
+                        current = .{ .node = n, .distance = d };
+                    }
+                }
+            }
+
+            if (current) |c| {
+                // For the current node, consider all of its unvisited neighbors and update their
+                // distances through the current node.
+                for (self.edges[c.node].items) |neighbor| {
+                    const old_distance = distance_from_start[neighbor];
+                    const new_distance = c.distance + 1;
+                    if (old_distance == null or new_distance < old_distance.?) {
+                        distance_from_start[neighbor] = new_distance;
+                    }
+                }
+
+                unvisited.setValue(c.node, false);
+            } else {
+                // The unvisited set contains only nodes with infinite distance (which are unreachable)
+                break;
+            }
+        }
+
+        return distance_from_start;
+    }
+};
+
+test "graph_shortest_paths" {
+    const edges = [_]Graph.Edge{ .{ 0, 1 }, .{ 1, 2 }, .{ 2, 3 }, .{ 0, 2 }, .{ 4, 5 }, .{ 3, 6 } };
+    const g = try Graph.init(test_allocator, edges[0..]);
+    defer g.deinit(test_allocator);
+
+    const distances = try g.shortest_path(test_allocator, 0);
+    defer test_allocator.free(distances);
+
+    std.debug.print("{any}\n", .{distances});
+
+    try std.testing.expect(distances.len > 0);
+}
