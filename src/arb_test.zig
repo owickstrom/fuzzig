@@ -203,7 +203,7 @@ test "graph shortest paths" {
 }
 
 test "graph shortest path is less than half" {
-    for (0..1000) |seed| {
+    for (10000..20000) |seed| {
         const entropy = try test_data.random_bytes(test_allocator, 1024 * 1024, seed);
         defer test_allocator.free(entropy);
 
@@ -226,11 +226,12 @@ test "graph shortest path is less than half" {
 
         // std.debug.print("{any}\n", .{distances});
 
-        for (distances) |distance| {
-            if (distance != null and distance.? > @divFloor(node_count, 2)) {
-                std.debug.print("{any}\n", .{edges});
-                std.debug.print("{any}\n", .{distances});
-                try std.testing.expect(false);
+        for (distances, 0..) |distance, i| {
+            const threshold = @divFloor(node_count, 10);
+            if (distance != null and distance.? > threshold) {
+                std.debug.print("distance ({d}) from start to node {d} was greater than {d}\n", .{ distance.?, i, threshold });
+                std.debug.print("edges: {any}\n", .{edges});
+                return error.TestUnexpectedResult;
             }
         }
     }
