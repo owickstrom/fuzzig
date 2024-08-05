@@ -191,7 +191,7 @@ const Graph = struct {
     }
 };
 
-test "graph_shortest_paths" {
+test "graph shortest paths" {
     const edges = [_]Graph.Edge{ .{ 0, 1 }, .{ 1, 2 }, .{ 2, 3 }, .{ 0, 2 }, .{ 4, 5 }, .{ 3, 6 } };
     const g = try Graph.init(test_allocator, edges[0..]);
     defer g.deinit(test_allocator);
@@ -199,7 +199,39 @@ test "graph_shortest_paths" {
     const distances = try g.shortest_path(test_allocator, 0);
     defer test_allocator.free(distances);
 
-    std.debug.print("{any}\n", .{distances});
+    try std.testing.expectEqualSlices(?Graph.Node, distances, &.{ 0, 1, 1, 2, null, null, 3 });
+}
 
-    try std.testing.expect(distances.len > 0);
+test "graph shortest path is less than half" {
+    for (0..1000) |seed| {
+        const entropy = try test_data.random_bytes(test_allocator, 1024 * 1024, seed);
+        defer test_allocator.free(entropy);
+
+        var td = try TestData.init(test_allocator, entropy);
+        defer td.deinit(test_allocator);
+
+        const node_count = 42;
+        var edges = try test_allocator.alloc(Graph.Edge, try arb.bounded_int(usize, 0, node_count * 4, td));
+        for (0..edges.len) |i| {
+            edges[i] = .{
+                try arb.bounded_int(Graph.Node, 0, node_count, td),
+                try arb.bounded_int(Graph.Node, 0, node_count, td),
+            };
+        }
+        const g = try Graph.init(test_allocator, edges);
+        defer g.deinit(test_allocator);
+
+        const distances = try g.shortest_path(test_allocator, 0);
+        defer test_allocator.free(distances);
+
+        // std.debug.print("{any}\n", .{distances});
+
+        for (distances) |distance| {
+            if (distance != null and distance.? > @divFloor(node_count, 2)) {
+                std.debug.print("{any}\n", .{edges});
+                std.debug.print("{any}\n", .{distances});
+                try std.testing.expect(false);
+            }
+        }
+    }
 }
