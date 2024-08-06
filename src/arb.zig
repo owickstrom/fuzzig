@@ -58,8 +58,8 @@ pub fn weighted(comptime E: type, comptime weights: std.enums.EnumFieldStruct(E,
 }
 
 pub fn boolean(data: *TestData) test_data.DrawError!bool {
-    const bytes: [1]u8 = undefined;
-    try data.draw(1, bytes);
+    var bytes: [1]u8 = undefined;
+    try data.draw(1, &bytes);
     return (bytes[0] & 1) == 1;
 }
 

@@ -8,6 +8,16 @@ const TestData = test_data.TestData;
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const test_allocator = gpa.allocator();
 
+test "bool" {
+    const entropy = try test_data.random_bytes(test_allocator, 1, 0);
+    defer test_allocator.free(entropy);
+
+    var td = try TestData.init(test_allocator, entropy);
+    defer td.deinit(test_allocator);
+
+    try std.testing.expect(try arb.boolean(td));
+}
+
 test "int" {
     const entropy = try test_data.random_bytes(test_allocator, 1024, 0);
     defer test_allocator.free(entropy);
