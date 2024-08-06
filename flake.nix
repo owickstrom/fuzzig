@@ -28,12 +28,22 @@
       system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
+        llvmPackages = pkgs.llvmPackages_18;
       in
       {
         devShells.default = pkgs.mkShell {
           packages = [
-            zig.packages.${system}.master
+            zig.packages.${system}."0.13.0"
             zls.packages.${system}.default
+
+            (pkgs.aflplusplus.override {
+              llvm = pkgs.llvm_18;
+              clang = llvmPackages.clang;
+              inherit llvmPackages;
+            })
+            llvmPackages.clang
+            llvmPackages.libcxxStdenv
+            llvmPackages.libcxxClang
           ];
         };
       }

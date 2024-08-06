@@ -88,4 +88,47 @@ pub fn build(b: *std.Build) void {
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_lib_unit_tests.step);
     test_step.dependOn(&run_exe_unit_tests.step);
+
+    const fuzz_lib = b.addStaticLibrary(.{
+        .name = "fuzz-lib",
+        // In this case the main source file is merely a path, however, in more
+        // complicated build scripts, this could be a generated file.
+        .root_source_file = b.path("src/fuzz.zig"),
+        .target = target,
+        .optimize = .Debug,
+    });
+    fuzz_lib.want_lto = true;
+    fuzz_lib.bundle_compiler_rt = true;
+    // Seems to be necessary for LLVM >= 15
+    fuzz_lib.root_module.pic = true;
+
+    // Setup the output name
+    const fuzz_executable_name = "fuzz";
+
+    // We want `afl-clang-lto -o path/to/output path/to/library`
+    const fuzz_compile = b.addSystemCommand(&.{ "afl-clang-lto", "-o" });
+    const fuzz_exe_path = fuzz_compile.addOutputFileArg("fuzz");
+    // Add the path to the library file to afl-clang-lto's args
+    fuzz_compile.addArtifactArg(fuzz_lib);
+
+    // Install the cached output to the install 'bin' path
+    const fuzz_install = b.addInstallBinFile(fuzz_exe_path, fuzz_executable_name);
+    fuzz_install.step.dependOn(&fuzz_compile.step);
+
+    // Add a top-level step that compiles and installs the fuzz executable
+    const fuzz_compile_run = b.step("fuzz", "Build executable for fuzz testing using afl-clang-lto");
+    fuzz_compile_run.dependOn(&fuzz_compile.step);
+    fuzz_compile_run.dependOn(&fuzz_install.step);
+
+    // Compile a companion exe for debugging crashes
+    const fuzz_debug_exe = b.addExecutable(.{
+        .name = "fuzz-debug",
+        .root_source_file = b.path("src/fuzz.zig"),
+        .target = target,
+        .optimize = .Debug,
+    });
+
+    // Only install fuzz-debug when the fuzz step is run
+    const install_fuzz_debug_exe = b.addInstallArtifact(fuzz_debug_exe, .{});
+    fuzz_compile_run.dependOn(&install_fuzz_debug_exe.step);
 }
