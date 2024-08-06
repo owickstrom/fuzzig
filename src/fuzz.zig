@@ -104,27 +104,34 @@ test "graph shortest paths" {
     try std.testing.expectEqualSlices(?Graph.Node, distances, &.{ 0, 1, 1, 2, null, null, 3 });
 }
 
-fn graph_shortest_path_no_longer_than_half(allocator: std.mem.Allocator, td: *TestData) !void {
-    const node_count = 42;
+fn edge(td: *TestData) !Graph.Edge {
+    return .{
+        try arb.bounded_int(Graph.Node, 0, 42, td),
+        try arb.bounded_int(Graph.Node, 0, 42, td),
+    };
+}
 
-    var edges = try allocator.alloc(Graph.Edge, try arb.bounded_int(usize, 0, node_count * 4, td));
-    defer allocator.free(edges);
-    for (0..edges.len) |i| {
-        edges[i] = .{
-            try arb.bounded_int(Graph.Node, 0, node_count, td),
-            try arb.bounded_int(Graph.Node, 0, node_count, td),
-        };
+fn graph_shortest_path_no_longer_than_half(allocator: std.mem.Allocator, td: *TestData) !void {
+    var edges = std.ArrayList(Graph.Edge).init(allocator);
+    defer edges.deinit();
+
+    while (arb.boolean(td) catch false) {
+        if (edge(td)) |e| {
+            try edges.append(e);
+        } else |_| {
+            break;
+        }
     }
 
-    const g = try Graph.init(allocator, edges);
+    const g = try Graph.init(allocator, edges.items);
     defer g.deinit(allocator);
 
     const distances = try g.shortest_path(allocator, 0);
     defer allocator.free(distances);
 
     for (distances, 0..) |distance, i| {
-        const threshold = @divFloor(node_count, 2);
-        if (distance != null and distance.? > threshold) {
+        const threshold = @divFloor(g.len, 2);
+        if (distance != null and g.len >= 42 and distance.? > threshold) {
             std.debug.print("distance ({d}) from start to node {d} was greater than {d}\n", .{ distance.?, i, threshold });
             std.debug.print("edges: {any}\n", .{edges});
             unreachable;
