@@ -89,11 +89,21 @@ pub fn build(b: *std.Build) void {
     test_step.dependOn(&run_lib_unit_tests.step);
     test_step.dependOn(&run_exe_unit_tests.step);
 
+    const fuzzers = [_]*std.Build.Step{
+        add_fuzzer(b, "shortest", target),
+    };
+    const fuzz_step = b.step("fuzz", "Build all fuzzers");
+    for (fuzzers) |fuzzer| {
+        fuzz_step.dependOn(fuzzer);
+    }
+}
+
+fn add_fuzzer(b: *std.Build, comptime name: []const u8, target: std.Build.ResolvedTarget) *std.Build.Step {
     const fuzz_lib = b.addStaticLibrary(.{
-        .name = "fuzz-lib",
+        .name = "fuzz-" ++ name ++ "-lib",
         // In this case the main source file is merely a path, however, in more
         // complicated build scripts, this could be a generated file.
-        .root_source_file = b.path("src/fuzz.zig"),
+        .root_source_file = b.path("src/fuzz_" ++ name ++ ".zig"),
         .target = target,
         .optimize = .Debug,
     });
@@ -103,11 +113,11 @@ pub fn build(b: *std.Build) void {
     fuzz_lib.root_module.pic = true;
 
     // Setup the output name
-    const fuzz_executable_name = "fuzz";
+    const fuzz_executable_name = "fuzz-" ++ name;
 
     // We want `afl-clang-lto -o path/to/output path/to/library`
     const fuzz_compile = b.addSystemCommand(&.{ "afl-clang-lto", "-o" });
-    const fuzz_exe_path = fuzz_compile.addOutputFileArg("fuzz");
+    const fuzz_exe_path = fuzz_compile.addOutputFileArg("fuzz-" ++ name);
     // Add the path to the library file to afl-clang-lto's args
     fuzz_compile.addArtifactArg(fuzz_lib);
 
@@ -116,19 +126,21 @@ pub fn build(b: *std.Build) void {
     fuzz_install.step.dependOn(&fuzz_compile.step);
 
     // Add a top-level step that compiles and installs the fuzz executable
-    const fuzz_compile_run = b.step("fuzz", "Build executable for fuzz testing using afl-clang-lto");
+    const fuzz_compile_run = b.step("fuzz-" ++ name, "Build executable for fuzz testing using afl-clang-lto");
     fuzz_compile_run.dependOn(&fuzz_compile.step);
     fuzz_compile_run.dependOn(&fuzz_install.step);
 
     // Compile a companion exe for debugging crashes
     const fuzz_debug_exe = b.addExecutable(.{
-        .name = "fuzz-debug",
-        .root_source_file = b.path("src/fuzz.zig"),
+        .name = "fuzz-" ++ name ++ "-debug",
+        .root_source_file = b.path("src/fuzz_" ++ name ++ ".zig"),
         .target = target,
         .optimize = .Debug,
     });
 
-    // Only install fuzz-debug when the fuzz step is run
+    // Only install debug program when the fuzz step is run
     const install_fuzz_debug_exe = b.addInstallArtifact(fuzz_debug_exe, .{});
     fuzz_compile_run.dependOn(&install_fuzz_debug_exe.step);
+
+    return fuzz_compile_run;
 }
