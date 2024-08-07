@@ -145,10 +145,10 @@ pub fn main() !void {
     defer std.debug.assert(gpa.deinit() == .ok);
 
     const stdin = std.io.getStdIn();
-    const entropy = try stdin.readToEndAlloc(allocator, std.math.maxInt(usize));
-    defer allocator.free(entropy);
+    const entropy = stdin.reader().any();
+    defer stdin.close();
 
-    var td = try TestData.init(allocator, entropy);
+    var td = try fuzzig.test_data.from_reader(allocator, entropy);
     defer td.deinit(allocator);
 
     try graph_shortest_path_no_longer_than_half(allocator, td);

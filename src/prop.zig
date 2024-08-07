@@ -33,14 +33,17 @@ pub fn check(allocator: std.mem.Allocator, config: PropTestConfig, prop: Prop) !
         const entropy = try test_data.random_bytes(allocator, size, seed);
         defer allocator.free(entropy);
 
-        var td = try TestData.init(allocator, entropy);
+        var fbs = std.io.fixedBufferStream(entropy);
+        var td = try test_data.from_reader(allocator, fbs.reader().any());
         defer td.deinit(allocator);
 
         if (prop(td)) |_| {} else |err| {
+            // All unused entropy is discarded straight away.
+            const used_entropy = entropy[0..td.cursor];
             const counter_example =
-                try shrink(allocator, config, td, prop) orelse
-                CounterExample{ .num = 0, .entropy = entropy, .err = err };
-            std.debug.print("\noriginal entropy: {}\n", .{std.fmt.fmtSliceHexLower(entropy)});
+                try shrink(allocator, config, used_entropy, prop) orelse
+                CounterExample{ .num = 0, .entropy = used_entropy, .err = err };
+            std.debug.print("\noriginal entropy: {}\n", .{std.fmt.fmtSliceHexLower(used_entropy)});
             std.debug.print("failed after {} run(s) and {} shrink(s)!\n", .{ i + 1, counter_example.num });
             if (counter_example.num > 0) {
                 std.debug.print("shrunk entropy: {}\n", .{std.fmt.fmtSliceHexLower(counter_example.entropy)});
@@ -50,15 +53,15 @@ pub fn check(allocator: std.mem.Allocator, config: PropTestConfig, prop: Prop) !
     }
 }
 
-const CandidatesQueue = std.fifo.LinearFifo([]u8, .Dynamic);
+const CandidatesQueue = std.fifo.LinearFifo([]const u8, .Dynamic);
 
 const CounterExample = struct {
     num: u32,
-    entropy: []u8,
+    entropy: []const u8,
     err: anyerror,
 };
 
-fn add_smaller(allocator: std.mem.Allocator, entropy: []u8, queue: *CandidatesQueue) !void {
+fn add_smaller(allocator: std.mem.Allocator, entropy: []const u8, queue: *CandidatesQueue) !void {
     if (entropy.len > 1 and @mod(entropy.len, 2) == 0) {
         // First half
         try queue.writeItem(entropy[entropy.len / 2 .. entropy.len]);
@@ -98,7 +101,7 @@ fn add_smaller(allocator: std.mem.Allocator, entropy: []u8, queue: *CandidatesQu
 /// Compares to entropy buffers in terms of "test size".
 ///
 /// Buffer lenght is most significant. After that, we use lexicographic byte order for equal-length buffers.
-fn is_smaller_than(left: []u8, right: []u8) bool {
+fn is_smaller_than(left: []const u8, right: []const u8) bool {
     if (left.len < right.len) {
         return true;
     } else if (left.len > right.len) {
@@ -113,14 +116,13 @@ fn is_smaller_than(left: []u8, right: []u8) bool {
     }
 }
 
-fn shrink(allocator: std.mem.Allocator, config: PropTestConfig, data: *TestData, prop: Prop) !?CounterExample {
+fn shrink(allocator: std.mem.Allocator, config: PropTestConfig, entropy: []const u8, prop: Prop) !?CounterExample {
     // TODO: tree of candidates (maybe ranges into the original entropy)?
     var candidates: CandidatesQueue = CandidatesQueue.init(allocator);
     defer candidates.deinit();
 
-    // We always start by shrinking the original input. Note that it's first trimmed, meaning
-    // that all unused entropy is discarded straight away.
-    try add_smaller(allocator, data.trimmed(), &candidates);
+    // We always start by shrinking the original input.
+    try add_smaller(allocator, entropy, &candidates);
 
     var counter_example_smallest: ?CounterExample = null;
     for (0..config.max_shrinks) |shrink_index| {
@@ -129,7 +131,8 @@ fn shrink(allocator: std.mem.Allocator, config: PropTestConfig, data: *TestData,
             break;
         };
 
-        var shorter_data = try TestData.init(allocator, candidate);
+        var fbs = std.io.fixedBufferStream(candidate);
+        var shorter_data = try test_data.from_reader(allocator, fbs.reader().any());
         defer shorter_data.deinit(allocator);
 
         if (prop(shorter_data)) |_| {

@@ -3,30 +3,32 @@ const assert = std.debug.assert;
 
 pub const DrawError = error{OutOfEntropy};
 
-pub const TestData = struct {
-    entropy: []u8,
+pub const TestData =
+    struct {
+    reader: std.io.AnyReader,
     cursor: usize,
 
     pub fn draw(self: *@This(), comptime bytes: u64, result: *[bytes]u8) !void {
         comptime {
             assert(bytes > 0);
         }
-        if (self.cursor + bytes > self.entropy.len) {
+
+        const read = try self.reader.read(result);
+        if (read < bytes) {
             return error.OutOfEntropy;
         }
 
-        std.mem.copyForwards(u8, result, self.entropy[self.cursor .. self.cursor + bytes]);
         self.cursor += bytes;
     }
 
     /// Returns the entropy used (up to the cursor).
     pub fn trimmed(self: *@This()) []u8 {
-        return self.entropy[0..self.cursor];
+        return self.reader[0..self.cursor];
     }
 
-    pub fn init(allocator: std.mem.Allocator, entropy: []u8) !*@This() {
+    pub fn init(allocator: std.mem.Allocator, reader: anytype) !*TestData {
         const result = try allocator.create(TestData);
-        result.entropy = entropy;
+        result.reader = reader;
         result.cursor = 0;
         return result;
     }
@@ -35,6 +37,10 @@ pub const TestData = struct {
         allocator.destroy(self);
     }
 };
+
+pub fn from_reader(allocator: std.mem.Allocator, reader: std.io.AnyReader) !*TestData {
+    return TestData.init(allocator, reader);
+}
 
 pub fn random_bytes(allocator: std.mem.Allocator, buf_size: usize, seed: u64) ![]u8 {
     var prng = std.rand.DefaultPrng.init(seed);

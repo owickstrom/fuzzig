@@ -1,7 +1,8 @@
 const std = @import("std");
 const assert = std.debug.assert;
 
-pub const TestData = @import("./test_data.zig").TestData;
+pub const test_data = @import("./test_data.zig");
+pub const TestData = test_data.TestData;
 
 pub const arb = @import("./arb.zig");
 pub const Arb = arb.Arb;

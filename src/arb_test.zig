@@ -12,7 +12,8 @@ test "bool" {
     const entropy = try test_data.random_bytes(test_allocator, 1, 0);
     defer test_allocator.free(entropy);
 
-    var td = try TestData.init(test_allocator, entropy);
+    var fbs = std.io.fixedBufferStream(entropy);
+    var td = try test_data.from_reader(test_allocator, fbs.reader().any());
     defer td.deinit(test_allocator);
 
     try std.testing.expect(try arb.boolean(td));
@@ -22,7 +23,8 @@ test "int" {
     const entropy = try test_data.random_bytes(test_allocator, 1024, 0);
     defer test_allocator.free(entropy);
 
-    var td = try TestData.init(test_allocator, entropy);
+    var fbs = std.io.fixedBufferStream(entropy);
+    var td = try test_data.from_reader(test_allocator, fbs.reader().any());
     defer td.deinit(test_allocator);
 
     const n = try arb.int(u32, td);
@@ -33,7 +35,8 @@ test "bounded_int" {
     const entropy = try test_data.random_bytes(test_allocator, 1024, 0);
     defer test_allocator.free(entropy);
 
-    var td = try TestData.init(test_allocator, entropy);
+    var fbs = std.io.fixedBufferStream(entropy);
+    var td = try test_data.from_reader(test_allocator, fbs.reader().any());
     defer td.deinit(test_allocator);
 
     for (0..100) |_| {
@@ -50,7 +53,8 @@ test "array of bounded_int" {
     const entropy = try test_data.random_bytes(test_allocator, @sizeOf(u32) * size, 0);
     defer test_allocator.free(entropy);
 
-    var td = try TestData.init(test_allocator, entropy);
+    var fbs = std.io.fixedBufferStream(entropy);
+    var td = try test_data.from_reader(test_allocator, fbs.reader().any());
     defer td.deinit(test_allocator);
 
     var result: [size]u32 = undefined;
@@ -67,7 +71,8 @@ test "single weighted" {
     const entropy = try test_data.random_bytes(test_allocator, 1024, 0);
     defer test_allocator.free(entropy);
 
-    var td = try TestData.init(test_allocator, entropy);
+    var fbs = std.io.fixedBufferStream(entropy);
+    var td = try test_data.from_reader(test_allocator, fbs.reader().any());
     defer td.deinit(test_allocator);
 
     const tag = try arb.weighted(enum { foo }, .{ .foo = 1 }, td);
@@ -78,7 +83,8 @@ test "multiple weighted" {
     const entropy = try test_data.random_bytes(test_allocator, 1024, 0);
     defer test_allocator.free(entropy);
 
-    var td = try TestData.init(test_allocator, entropy);
+    var fbs = std.io.fixedBufferStream(entropy);
+    var td = try test_data.from_reader(test_allocator, fbs.reader().any());
     defer td.deinit(test_allocator);
 
     const x = try arb.weighted(enum { foo, bar }, .{
@@ -94,7 +100,8 @@ test "many weighted" {
         const entropy = try test_data.random_bytes(test_allocator, 1024, i);
         defer test_allocator.free(entropy);
 
-        var td = try TestData.init(test_allocator, entropy);
+        var fbs = std.io.fixedBufferStream(entropy);
+        var td = try test_data.from_reader(test_allocator, fbs.reader().any());
         defer td.deinit(test_allocator);
 
         const x = try arb.weighted(enum { foo }, .{
@@ -110,7 +117,8 @@ test "enum_value" {
     const entropy = try test_data.random_bytes(test_allocator, 1024, 0);
     defer test_allocator.free(entropy);
 
-    var td = try TestData.init(test_allocator, entropy);
+    var fbs = std.io.fixedBufferStream(entropy);
+    var td = try test_data.from_reader(test_allocator, fbs.reader().any());
     defer td.deinit(test_allocator);
 
     const color = try arb.enum_value(Color, td);

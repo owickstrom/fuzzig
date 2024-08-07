@@ -4,34 +4,12 @@ const assert = std.debug.assert;
 const test_data = @import("./test_data.zig");
 const TestData = test_data.TestData;
 
-// pub fn draw(arb: *Arb(T), data: *TestData, allocator: std.mem.Allocator) !T {
-//     const self: *@This() = @alignCast(@fieldParentPtr("arb", arb));
-//     comptime var total: u64 = 0;
-//
-//     comptime {
-//         for (self.weights) |weighted| {
-//             assert(weighted[0] > 0);
-//             total += weighted[0];
-//         }
-//     }
-//
-//     const pick = try bounded_int(u64, 0, total).draw(data, allocator);
-//     var current: u64 = 0;
-//     inline for (self.weights) |weighted| {
-//         current += weighted[0];
-//         if (pick < current) {
-//             return weighted[1].draw(data, allocator);
-//         }
-//     }
-//     unreachable;
-// }
-
 /// Draw an enum value from `E` based on the relative `weights`. Fields in the weights struct must match
 /// the enum.
 ///
 /// The `E` type parameter should be inferred, but seemingly to due to https://github.com/ziglang/zig/issues/19985,
 /// it can't be.
-pub fn weighted(comptime E: type, comptime weights: std.enums.EnumFieldStruct(E, u32, null), data: *TestData) !E {
+pub fn weighted(comptime E: type, comptime weights: std.enums.EnumFieldStruct(E, u32, null), data: anytype) !E {
     const s = @typeInfo(@TypeOf(weights)).Struct;
     comptime var total: u64 = 0;
     comptime var enum_weights: [s.fields.len]std.meta.Tuple(&.{ E, comptime_int }) = undefined;
@@ -57,19 +35,19 @@ pub fn weighted(comptime E: type, comptime weights: std.enums.EnumFieldStruct(E,
     unreachable;
 }
 
-pub fn boolean(data: *TestData) test_data.DrawError!bool {
+pub fn boolean(data: anytype) !bool {
     var bytes: [1]u8 = undefined;
     try data.draw(1, &bytes);
     return (bytes[0] & 1) == 1;
 }
 
-pub fn byte(data: *TestData) test_data.DrawError!u8 {
-    const bytes: [1]u8 = undefined;
-    try data.draw(1, bytes);
+pub fn byte(data: anytype) !u8 {
+    var bytes: [1]u8 = undefined;
+    try data.draw(1, &bytes);
     return bytes[0];
 }
 
-pub fn int(T: type, data: *TestData) test_data.DrawError!T {
+pub fn int(T: type, data: anytype) !T {
     const bit_count = @typeInfo(T).Int.bits;
     const byte_count = bit_count / 8;
     var bytes: [byte_count]u8 = undefined;
@@ -84,13 +62,13 @@ pub fn int(T: type, data: *TestData) test_data.DrawError!T {
 }
 
 /// Draw an integer of type `T` between `start` (incl) and `end` (excl).
-pub fn bounded_int(comptime T: type, start: T, end: T, data: *TestData) test_data.DrawError!T {
+pub fn bounded_int(comptime T: type, start: T, end: T, data: anytype) !T {
     assert(start < end);
     const diff = end - start;
     return ((try int(T, data)) % diff) + start;
 }
 
-pub fn enum_value(T: type, data: *TestData) test_data.DrawError!T {
+pub fn enum_value(T: type, data: anytype) !T {
     comptime var values: [@typeInfo(T).Enum.fields.len]usize = undefined;
     inline for (@typeInfo(T).Enum.fields, 0..) |field, i| {
         values[i] = field.value;
