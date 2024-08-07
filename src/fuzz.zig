@@ -115,7 +115,8 @@ fn graph_shortest_path_no_longer_than_half(allocator: std.mem.Allocator, td: *Te
     var edges = std.ArrayList(Graph.Edge).init(allocator);
     defer edges.deinit();
 
-    while (arb.boolean(td) catch false) {
+    const nodes = try arb.bounded_int(u8, 0, 100, td);
+    for (0..nodes) |_| {
         if (edge(td)) |e| {
             try edges.append(e);
         } else |_| {

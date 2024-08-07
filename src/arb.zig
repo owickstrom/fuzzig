@@ -9,7 +9,7 @@ const TestData = test_data.TestData;
 ///
 /// The `E` type parameter should be inferred, but seemingly to due to https://github.com/ziglang/zig/issues/19985,
 /// it can't be.
-pub fn weighted(comptime E: type, comptime weights: std.enums.EnumFieldStruct(E, u32, null), data: anytype) !E {
+pub fn weighted(comptime E: type, comptime weights: std.enums.EnumFieldStruct(E, u32, null), data: *TestData) !E {
     const s = @typeInfo(@TypeOf(weights)).Struct;
     comptime var total: u64 = 0;
     comptime var enum_weights: [s.fields.len]std.meta.Tuple(&.{ E, comptime_int }) = undefined;
@@ -35,19 +35,19 @@ pub fn weighted(comptime E: type, comptime weights: std.enums.EnumFieldStruct(E,
     unreachable;
 }
 
-pub fn boolean(data: anytype) !bool {
+pub fn boolean(data: *TestData) !bool {
     var bytes: [1]u8 = undefined;
     try data.draw(1, &bytes);
     return (bytes[0] & 1) == 1;
 }
 
-pub fn byte(data: anytype) !u8 {
+pub fn byte(data: *TestData) !u8 {
     var bytes: [1]u8 = undefined;
     try data.draw(1, &bytes);
     return bytes[0];
 }
 
-pub fn int(T: type, data: anytype) !T {
+pub fn int(T: type, data: *TestData) !T {
     const bit_count = @typeInfo(T).Int.bits;
     const byte_count = bit_count / 8;
     var bytes: [byte_count]u8 = undefined;
@@ -62,13 +62,13 @@ pub fn int(T: type, data: anytype) !T {
 }
 
 /// Draw an integer of type `T` between `start` (incl) and `end` (excl).
-pub fn bounded_int(comptime T: type, start: T, end: T, data: anytype) !T {
+pub fn bounded_int(comptime T: type, start: T, end: T, data: *TestData) !T {
     assert(start < end);
     const diff = end - start;
     return ((try int(T, data)) % diff) + start;
 }
 
-pub fn enum_value(T: type, data: anytype) !T {
+pub fn enum_value(T: type, data: *TestData) !T {
     comptime var values: [@typeInfo(T).Enum.fields.len]usize = undefined;
     inline for (@typeInfo(T).Enum.fields, 0..) |field, i| {
         values[i] = field.value;
