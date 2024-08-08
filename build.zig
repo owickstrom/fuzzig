@@ -91,6 +91,7 @@ pub fn build(b: *std.Build) void {
 
     const fuzzers = [_]*std.Build.Step{
         add_fuzzer(b, "shortest", target),
+        add_fuzzer(b, "bound5", target),
     };
     const fuzz_step = b.step("fuzz", "Build all fuzzers");
     for (fuzzers) |fuzzer| {
@@ -105,7 +106,7 @@ fn add_fuzzer(b: *std.Build, comptime name: []const u8, target: std.Build.Resolv
         // complicated build scripts, this could be a generated file.
         .root_source_file = b.path("src/fuzz_" ++ name ++ ".zig"),
         .target = target,
-        .optimize = .Debug,
+        .optimize = .ReleaseFast,
     });
     fuzz_lib.want_lto = true;
     fuzz_lib.bundle_compiler_rt = true;

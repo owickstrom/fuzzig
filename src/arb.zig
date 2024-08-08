@@ -49,16 +49,12 @@ pub fn byte(data: *TestData) !u8 {
 
 pub fn int(T: type, data: *TestData) !T {
     const bit_count = @typeInfo(T).Int.bits;
+    comptime assert(@rem(bit_count, 8) == 0);
     const byte_count = bit_count / 8;
+
     var bytes: [byte_count]u8 = undefined;
     try data.draw(byte_count, &bytes);
-    const result = std.mem.readInt(T, &bytes, .big);
-    if (@rem(bit_count, 64) == 0) {
-        return result;
-    } else {
-        const mask = (1 << bit_count) - 1;
-        return result & mask;
-    }
+    return std.mem.readInt(T, &bytes, .big);
 }
 
 /// Draw an integer of type `T` between `start` (incl) and `end` (excl).

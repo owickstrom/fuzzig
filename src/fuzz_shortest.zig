@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const fuzzig = @import("./root.zig");
+const fuzz = @import("./fuzz.zig");
 const arb = fuzzig.arb;
 const TestData = fuzzig.TestData;
 
@@ -141,18 +142,7 @@ fn graph_shortest_path_no_longer_than_half(allocator: std.mem.Allocator, td: *Te
 }
 
 pub fn main() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    const allocator = gpa.allocator();
-    defer std.debug.assert(gpa.deinit() == .ok);
-
-    const stdin = std.io.getStdIn();
-    const entropy = stdin.reader().any();
-    defer stdin.close();
-
-    var td = try fuzzig.test_data.from_reader(allocator, entropy);
-    defer td.deinit(allocator);
-
-    try graph_shortest_path_no_longer_than_half(allocator, td);
+    try fuzz.fuzzer_main(graph_shortest_path_no_longer_than_half);
 }
 
 fn cMain() callconv(.C) void {
