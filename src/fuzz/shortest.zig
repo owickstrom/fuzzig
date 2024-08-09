@@ -1,7 +1,7 @@
 const std = @import("std");
 
 const fuzzig = @import("fuzzig");
-const fuzz = @import("./fuzz.zig");
+const cli = @import("./cli.zig");
 const arb = fuzzig.arb;
 const TestData = fuzzig.TestData;
 
@@ -142,7 +142,7 @@ fn graph_shortest_path_no_longer_than_half(allocator: std.mem.Allocator, td: *Te
 }
 
 pub fn main() !void {
-    try fuzz.fuzzer_main(graph_shortest_path_no_longer_than_half);
+    try cli.fuzzer_main(graph_shortest_path_no_longer_than_half);
 }
 
 fn cMain() callconv(.C) void {

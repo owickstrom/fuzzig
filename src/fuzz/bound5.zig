@@ -1,7 +1,7 @@
 const std = @import("std");
 
 const fuzzig = @import("fuzzig");
-const fuzz = @import("./fuzz.zig");
+const cli = @import("./cli.zig");
 const arb = fuzzig.arb;
 const TestData = fuzzig.TestData;
 
@@ -57,7 +57,7 @@ fn postcondition(input: Input) bool {
 }
 
 pub fn main() !void {
-    try fuzz.fuzzer_main(bound5);
+    try cli.fuzzer_main(bound5);
 }
 
 fn cMain() callconv(.C) void {

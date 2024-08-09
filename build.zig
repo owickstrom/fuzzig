@@ -64,7 +64,7 @@ fn add_fuzzer(b: *std.Build, comptime name: []const u8, target: std.Build.Resolv
         .name = "fuzz-" ++ name ++ "-lib",
         // In this case the main source file is merely a path, however, in more
         // complicated build scripts, this could be a generated file.
-        .root_source_file = b.path("src/fuzz_" ++ name ++ ".zig"),
+        .root_source_file = b.path("src/fuzz/" ++ name ++ ".zig"),
         .target = target,
         .optimize = .ReleaseFast,
     });
@@ -95,7 +95,7 @@ fn add_fuzzer(b: *std.Build, comptime name: []const u8, target: std.Build.Resolv
     // Compile a companion exe for debugging crashes
     const fuzz_debug_exe = b.addExecutable(.{
         .name = "fuzz-" ++ name ++ "-debug",
-        .root_source_file = b.path("src/fuzz_" ++ name ++ ".zig"),
+        .root_source_file = b.path("src/fuzz/" ++ name ++ ".zig"),
         .target = target,
         .optimize = .Debug,
     });
