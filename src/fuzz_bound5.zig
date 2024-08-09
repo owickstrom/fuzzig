@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const fuzzig = @import("./root.zig");
+const fuzzig = @import("fuzzig");
 const fuzz = @import("./fuzz.zig");
 const arb = fuzzig.arb;
 const TestData = fuzzig.TestData;
@@ -52,6 +52,7 @@ fn postcondition(input: Input) bool {
             sum += n;
         }
     }
+    std.debug.print("sum: {d}\n", .{sum});
     return sum < (256 * 5);
 }
 

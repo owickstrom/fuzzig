@@ -1,5 +1,5 @@
 const std = @import("std");
-const fuzzig = @import("./root.zig");
+const fuzzig = @import("fuzzig");
 const TestData = fuzzig.TestData;
 
 pub fn fuzzer_main(fuzzer: fn (std.mem.Allocator, *TestData) anyerror!void) !void {

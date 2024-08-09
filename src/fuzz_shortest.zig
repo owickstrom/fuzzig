@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const fuzzig = @import("./root.zig");
+const fuzzig = @import("fuzzig");
 const fuzz = @import("./fuzz.zig");
 const arb = fuzzig.arb;
 const TestData = fuzzig.TestData;
