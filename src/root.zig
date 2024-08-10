@@ -8,3 +8,8 @@ pub const arb = @import("./arb.zig");
 pub const Arb = arb.Arb;
 
 pub const prop_test = @import("./prop.zig").prop_test;
+
+// for now...
+pub const examples = .{
+    .bound5 = @import("./examples/bound5.zig").bound5,
+};
