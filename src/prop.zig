@@ -74,7 +74,7 @@ fn add_smaller(allocator: std.mem.Allocator, entropy: []const u8, queue: *Candid
             const entropy_new = try allocator.alloc(u8, entropy.len);
             @memcpy(entropy_new, entropy);
             for (0..entropy_new.len / 2) |i| {
-                entropy_new[i] = entropy_new[i] / 2;
+                entropy_new[i] /= 2;
             }
             try queue.writeItem(entropy_new);
         }
@@ -84,7 +84,7 @@ fn add_smaller(allocator: std.mem.Allocator, entropy: []const u8, queue: *Candid
             const entropy_new = try allocator.alloc(u8, entropy.len);
             @memcpy(entropy_new, entropy);
             for (entropy_new.len / 2..entropy.len) |i| {
-                entropy_new[i] = entropy_new[i] / 2;
+                entropy_new[i] /= 2;
             }
             try queue.writeItem(entropy_new);
         }
@@ -98,10 +98,10 @@ fn add_smaller(allocator: std.mem.Allocator, entropy: []const u8, queue: *Candid
     }
 }
 
-/// Compares to entropy buffers in terms of "test size".
-///
-/// Buffer lenght is most significant. After that, we use lexicographic byte order for equal-length buffers.
-fn is_smaller_than(left: []const u8, right: []const u8) bool {
+/// Compare entropy slices in terms of test size, i.e. shortlex order
+/// (slice length being most significant, and after that, lexicographic
+/// byte order for equal-length slices.)
+fn shortlex_smaller(left: []const u8, right: []const u8) bool {
     if (left.len < right.len) {
         return true;
     } else if (left.len > right.len) {
@@ -122,6 +122,9 @@ fn shrink(allocator: std.mem.Allocator, config: PropTestConfig, entropy: []const
     defer candidates.deinit();
 
     // We always start by shrinking the original input.
+    //
+    // TODO: these are never freed (tricky when some are discarded and some saved).
+    // Maybe use an arena allocator? Or free on discard, even if more fiddly.
     try add_smaller(allocator, entropy, &candidates);
 
     var counter_example_smallest: ?CounterExample = null;
@@ -141,15 +144,16 @@ fn shrink(allocator: std.mem.Allocator, config: PropTestConfig, entropy: []const
         } else |err| {
             switch (err) {
                 error.OutOfEntropy => {
+                    std.debug.print("out of entropy\n", .{});
                     // If we can't draw, the entropy has probably been shrunk too much.
                     // TODO: remove this assumption and try to shrink anyway? perhaps just changing the strategy?
-                    break;
+                    continue;
                 },
                 else => {
                     const counter_example_new: CounterExample =
                         .{ .num = @intCast(shrink_index + 1), .entropy = candidate, .err = err };
                     if (counter_example_smallest) |counter_example_old| {
-                        if (is_smaller_than(counter_example_new.entropy, counter_example_old.entropy)) {
+                        if (shortlex_smaller(counter_example_new.entropy, counter_example_old.entropy)) {
                             counter_example_smallest = counter_example_new;
                         }
                     } else {

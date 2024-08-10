@@ -5,24 +5,23 @@ const cli = @import("./cli.zig");
 const arb = fuzzig.arb;
 const TestData = fuzzig.TestData;
 
-const Input = [5]std.ArrayList(i16);
+const Input = [5][]const i16;
 
 fn bound5(allocator: std.mem.Allocator, td: *TestData) !void {
     var input: Input = undefined;
     for (0..5) |i| {
-        var numbers = std.ArrayList(i16).init(allocator);
+        var numbers = try allocator.alloc(i16, 1);
 
-        for (0..1) |_| {
-            const n = arb.int(i16, td) catch break;
-            try numbers.append(n);
+        for (0..numbers.len) |n| {
+            numbers[n] = try arb.int(i16, td);
         }
 
         input[i] = numbers;
+        std.debug.print("{any}\n", .{numbers});
     }
 
     defer for (input) |numbers| {
-        std.debug.print("{any}\n", .{numbers.items});
-        numbers.deinit();
+        allocator.free(numbers);
     };
 
     try property(input);
@@ -35,11 +34,12 @@ fn property(input: Input) !void {
 }
 
 fn precondition(input: Input) bool {
-    for (input) |list| {
+    for (input) |numbers| {
         var sum: i16 = 0;
-        for (list.items) |n| {
-            sum += n;
+        for (numbers) |n| {
+            sum +%= n;
         }
+        std.debug.print("precondition sum {any} = {d}\n", .{ numbers, sum });
         if (sum >= 256) return false;
     }
     return true;
@@ -47,9 +47,9 @@ fn precondition(input: Input) bool {
 
 fn postcondition(input: Input) bool {
     var sum: i16 = 0;
-    for (input) |list| {
-        for (list.items) |n| {
-            sum += n;
+    for (input) |numbers| {
+        for (numbers) |n| {
+            sum +%= n;
         }
     }
     std.debug.print("sum: {d}\n", .{sum});

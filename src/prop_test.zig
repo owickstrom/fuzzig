@@ -122,3 +122,56 @@ test "prop_check_example3" {
     const result = prop.check(test_allocator, .{ .max_shrinks = 10000 }, prop_example3);
     try std.testing.expectError(error.TestUnexpectedResult, result);
 }
+
+const Bound5Input = [5][]const i16;
+
+fn prop_bounds5(td: *TestData) !void {
+    var input: Bound5Input = undefined;
+    std.debug.print("numbers:\n", .{});
+    for (0..5) |i| {
+        var numbers = try test_allocator.alloc(i16, 1);
+
+        for (0..numbers.len) |n| {
+            numbers[n] = try arb.int(i16, td);
+        }
+
+        input[i] = numbers;
+        std.debug.print("{any}\n", .{numbers});
+    }
+
+    defer for (input) |numbers| {
+        test_allocator.free(numbers);
+    };
+
+    if (bound5_precondition(input)) {
+        try std.testing.expect(bound5_postcondition(input));
+    }
+}
+
+fn bound5_precondition(input: Bound5Input) bool {
+    for (input) |numbers| {
+        var sum: i16 = 0;
+        for (numbers) |n| {
+            sum +%= n;
+        }
+        if (sum >= 256) return false;
+    }
+    return true;
+}
+
+fn bound5_postcondition(input: Bound5Input) bool {
+    var sum: i16 = 0;
+    for (input) |numbers| {
+        for (numbers) |n| {
+            sum +%= n;
+        }
+    }
+    std.debug.print("postcondition: {d}\n", .{sum});
+    return sum < (256 * 5);
+}
+
+test "prop_check_bound5" {
+    try prop.check(test_allocator, .{ .runs = 1000, .max_shrinks = 50000 }, prop_bounds5);
+    // const result = prop.check(test_allocator, .{ .max_shrinks = 10000 }, prop_example4);
+    // try std.testing.expectError(error.TestUnexpectedResult, result);
+}

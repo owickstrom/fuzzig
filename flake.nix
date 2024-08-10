@@ -22,8 +22,6 @@
       nixpkgs,
       ...
     }:
-    # Now eachDefaultSystem is only using ["x86_64-linux"], but this list can also
-    # further be changed by users of your flake.
     flake-utils.lib.eachDefaultSystem (
       system:
       let
@@ -41,9 +39,6 @@
               clang = llvmPackages.clang;
               inherit llvmPackages;
             })
-            llvmPackages.clang
-            llvmPackages.libcxxStdenv
-            llvmPackages.libcxxClang
           ];
         };
       }
